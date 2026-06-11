@@ -199,6 +199,18 @@ import { CharacterCard, WorldBook, RegexScript } from 'parsecard';
 import { loadCharacterCard, saveCharacterCard } from 'parsecard/node';
 ```
 
+### 时间戳兼容
+
+`CharacterCard.fromJSON()` 和 `normalizeTimestamp()` 会将以下 `create_date` 输入规范化为 ISO 8601 UTC：
+
+- ISO 8601 和其他 JavaScript 可解析的日期字符串。
+- 10 位 Unix 秒数字或数字字符串。
+- 13 位 Unix 毫秒数字或数字字符串。
+- 旧版使用的 `"{10 位 Unix 秒}Z"` 格式。
+
+无法解析的输入保持向后兼容，会回退为当前时间。`CharacterCard.toJSON({ create_date })`
+也接受字符串、Unix 秒或 Unix 毫秒。
+
 ## API 概览
 
 ### `CharacterCard`

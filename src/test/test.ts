@@ -24,6 +24,7 @@ import {
     // 工具
     createTimestamp,
     isValidTimestamp,
+    normalizeTimestamp,
     deepClone,
     asStringArray,
     // PNG
@@ -606,6 +607,52 @@ chainCard
 
 assert(chainCard.hasWorldBook, '链式调用：世界书绑定成功');
 assert(chainCard.regexScripts.length === 2, '链式调用：正则脚本绑定成功');
+
+// ============================================================
+//  测试19：时间戳兼容与 round-trip
+// ============================================================
+section('测试19：时间戳兼容与 round-trip');
+
+const timestampCases: Array<[unknown, string, string]> = [
+    ['2026-06-11T00:00:00.000Z', '2026-06-11T00:00:00.000Z', 'ISO 8601'],
+    ['2026-06-11 08:00:00+08:00', '2026-06-11T00:00:00.000Z', '可解析日期字符串'],
+    [1781136000, '2026-06-11T00:00:00.000Z', '10 位 Unix 秒数字'],
+    ['1781136000', '2026-06-11T00:00:00.000Z', '10 位 Unix 秒字符串'],
+    ['1781136000Z', '2026-06-11T00:00:00.000Z', '旧版 Unix 秒 Z 格式'],
+    [1781136000000, '2026-06-11T00:00:00.000Z', '13 位 Unix 毫秒数字'],
+    ['1781136000000', '2026-06-11T00:00:00.000Z', '13 位 Unix 毫秒字符串'],
+];
+
+for (const [input, expected, label] of timestampCases) {
+    assert(normalizeTimestamp(input) === expected, `${label} 规范化正确`);
+
+    const timestampCard = CharacterCard.fromJSON({
+        spec: 'chara_card_v3',
+        spec_version: '3.0',
+        create_date: input,
+        data: { name: `timestamp-${label}` },
+    });
+    assert(
+        (timestampCard.toJSON() as Record<string, any>).create_date === expected,
+        `${label} CharacterCard round-trip 正确`,
+    );
+}
+
+const timestampOverrideCard = CharacterCard.create({ name: 'timestamp-override' });
+assert(
+    (timestampOverrideCard.toJSON({ create_date: 1781136000 }) as Record<string, any>).create_date ===
+        '2026-06-11T00:00:00.000Z',
+    'SerializeOptions 支持 Unix 秒数字',
+);
+
+const invalidTimestampStart = Date.now();
+const invalidTimestamp = normalizeTimestamp('not-a-timestamp');
+const invalidTimestampEnd = Date.now();
+const invalidTimestampValue = new Date(invalidTimestamp).getTime();
+assert(
+    invalidTimestampValue >= invalidTimestampStart && invalidTimestampValue <= invalidTimestampEnd,
+    '无效时间戳保持回退到当前时间的兼容行为',
+);
 
 // ============================================================
 //  测试结果汇总

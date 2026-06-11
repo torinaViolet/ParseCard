@@ -228,8 +228,8 @@ export interface RegexScriptData {
 export interface SerializeOptions {
     /** 头像字段值 */
     avatar?: string;
-    /** 创建日期 */
-    create_date?: string;
+    /** 创建日期：日期字符串、Unix 秒或 Unix 毫秒 */
+    create_date?: string | number;
 }
 
 /** 文件保存选项 */

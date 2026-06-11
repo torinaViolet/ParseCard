@@ -26,17 +26,31 @@ export function isValidTimestamp(timestamp: string): boolean {
 
 /**
  * 修复/规范化时间戳为 ISO 8601 格式
+ * 支持 ISO/可解析日期字符串、10 位 Unix 秒、13 位 Unix 毫秒，
+ * 以及旧版使用的 "{10 位 Unix 秒}Z" 格式。
  * 如果无法解析则返回当前时间的时间戳
  */
 export function normalizeTimestamp(timestamp: unknown): string {
     if (typeof timestamp === 'string') {
-        const date = new Date(timestamp);
+        const value = timestamp.trim();
+        const unixSecondsMatch = /^(\d{10})Z?$/.exec(value);
+        if (unixSecondsMatch) {
+            return new Date(Number(unixSecondsMatch[1]) * 1000).toISOString();
+        }
+        if (/^\d{13}$/.test(value)) {
+            return new Date(Number(value)).toISOString();
+        }
+
+        const date = new Date(value);
         if (!isNaN(date.getTime())) {
             return date.toISOString();
         }
     }
-    if (typeof timestamp === 'number') {
-        const date = new Date(timestamp);
+    if (typeof timestamp === 'number' && Number.isFinite(timestamp)) {
+        const milliseconds = Number.isInteger(timestamp) && timestamp >= 1_000_000_000 && timestamp <= 9_999_999_999
+            ? timestamp * 1000
+            : timestamp;
+        const date = new Date(milliseconds);
         if (!isNaN(date.getTime())) {
             return date.toISOString();
         }
