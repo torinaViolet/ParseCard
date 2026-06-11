@@ -1,0 +1,17 @@
+{
+    "id": "92fde386-d80d-465a-a247-c9ed7a7c8398",
+    "scriptName": "测试正则-作用范围【推理】",
+    "findRegex": "",
+    "replaceString": "",
+    "trimStrings": [],
+    "placement": [
+        6
+    ],
+    "disabled": false,
+    "markdownOnly": true,
+    "promptOnly": false,
+    "runOnEdit": true,
+    "substituteRegex": 0,
+    "minDepth": null,
+    "maxDepth": null
+}

@@ -1,0 +1,73 @@
+{
+    "name": "测试角色",
+    "description": "这个是角色描述字段",
+    "personality": "这个是角色设定摘要，是角色描述的简要",
+    "scenario": "交互的情景或者背景字段",
+    "first_mes": "这个是第一条消息",
+    "mes_example": "<START>\r\n这里是对话示例，每一个对话示例都要使用<START>隔开。",
+    "creatorcomment": "创作者的注释，可以是简介，或者其他之类的",
+    "avatar": "none",
+    "talkativeness": "0.5",
+    "fav": false,
+    "tags": [
+        "这里是标签，使用逗号隔开，我用了中文逗号，不确定是否生效，标签1",
+        "标签2，标签1和2使用了英文逗号"
+    ],
+    "spec": "chara_card_v3",
+    "spec_version": "3.0",
+    "data": {
+        "name": "测试角色",
+        "description": "这个是角色描述字段",
+        "personality": "这个是角色设定摘要，是角色描述的简要",
+        "scenario": "交互的情景或者背景字段",
+        "first_mes": "这个是第一条消息",
+        "mes_example": "<START>\r\n这里是对话示例，每一个对话示例都要使用<START>隔开。",
+        "creator_notes": "创作者的注释，可以是简介，或者其他之类的",
+        "system_prompt": "这里是主要提示词，在这里填写的内容将会替换预设中的主要提示词",
+        "post_history_instructions": "这里是后续历史指令（翻译是这样说的）我的理解是，这个指令会在消息会紧跟着用户最新的消息。",
+        "tags": [
+            "这里是标签，使用逗号隔开，我用了中文逗号，不确定是否生效，标签1",
+            "标签2，标签1和2使用了英文逗号"
+        ],
+        "creator": "这里创作者的名字（元数据）",
+        "character_version": "角色版本",
+        "alternate_greetings": [
+            "这个是额外问候语1，可以创建多个。"
+        ],
+        "extensions": {
+            "talkativeness": "0.5",
+            "fav": false,
+            "world": "",
+            "depth_prompt": {
+                "prompt": "角色备注字段（我的理解是这个字段可以让创作者自己插入一个消息，用来控制一些东西的？）",
+                "depth": 4,
+                "role": "system"
+            },
+            "regex_scripts": [
+                {
+                    "id": "c3d7876b-a4a0-42f1-aaef-8545f97e836b",
+                    "scriptName": "测试正则",
+                    "findRegex": "这里是查找正则表达式",
+                    "replaceString": "这里是替换的字符。默认的提示文本：\n```\n使用 {{match}} 包含来自“查找正则表达式”或“$1”、“$2”等的匹配文本作为捕获组。\n```",
+                    "trimStrings": [
+                        "这里是修剪正则表达式中不需要的部分。默认的提示词文本：",
+                        "```",
+                        "在替换之前全局修剪正则表达式匹配中任何不需要的部分。用回车键分隔每个元素。",
+                        "```"
+                    ],
+                    "placement": [
+                        1
+                    ],
+                    "disabled": false,
+                    "markdownOnly": true,
+                    "promptOnly": false,
+                    "runOnEdit": true,
+                    "substituteRegex": 0,
+                    "minDepth": null,
+                    "maxDepth": null
+                }
+            ]
+        }
+    },
+    "create_date": "2026-04-10T17:13:23.447Z"
+}

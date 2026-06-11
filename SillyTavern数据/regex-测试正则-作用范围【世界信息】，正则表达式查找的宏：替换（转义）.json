@@ -1,0 +1,17 @@
+{
+    "id": "00976b77-4a36-4456-8e01-46c58ae44c0b",
+    "scriptName": "测试正则-作用范围【世界信息】，正则表达式查找的宏：替换（转义）",
+    "findRegex": "",
+    "replaceString": "",
+    "trimStrings": [],
+    "placement": [
+        5
+    ],
+    "disabled": false,
+    "markdownOnly": true,
+    "promptOnly": false,
+    "runOnEdit": true,
+    "substituteRegex": 2,
+    "minDepth": null,
+    "maxDepth": null
+}

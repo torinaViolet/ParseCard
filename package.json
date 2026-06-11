@@ -1,0 +1,66 @@
+{
+    "name": "parsecard",
+    "version": "2.0.0",
+    "description": "SillyTavern 角色卡、世界书、正则脚本的解析与序列化工具库（面向对象，TypeScript）",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
+        },
+        "./node": {
+            "types": "./dist/io.d.ts",
+            "import": "./dist/io.js",
+            "default": "./dist/io.js"
+        }
+    },
+    "files": [
+        "dist/",
+        "src/*.ts"
+    ],
+    "scripts": {
+        "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+        "clean:test": "node -e \"require('node:fs').rmSync('.test-dist', { recursive: true, force: true })\"",
+        "build": "npm run clean && tsc -p tsconfig.build.json",
+        "test:compile": "npm run clean:test && tsc -p tsconfig.test.json",
+        "test:core": "npm run build && npm run test:compile && node .test-dist/test/test.js",
+        "test:io": "npm run build && npm run test:compile && node .test-dist/test/test-io.js",
+        "test": "npm run build && npm run test:compile && node .test-dist/test/test.js && node .test-dist/test/test-io.js",
+        "prepack": "npm run build",
+        "prepublishOnly": "npm test"
+    },
+    "keywords": [
+        "sillytavern",
+        "character-card",
+        "world-book",
+        "lorebook",
+        "regex-script",
+        "roleplay",
+        "parser",
+        "typescript"
+    ],
+    "license": "Apache-2.0",
+    "author": "torinaViolet",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/torinaViolet/ParseCard.git"
+    },
+    "bugs": {
+        "url": "https://github.com/torinaViolet/ParseCard/issues"
+    },
+    "homepage": "https://github.com/torinaViolet/ParseCard#readme",
+    "sideEffects": false,
+    "engines": {
+        "node": ">=18"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "devDependencies": {
+        "@types/node": "^25.6.0",
+        "typescript": "^5.8.0"
+    }
+}

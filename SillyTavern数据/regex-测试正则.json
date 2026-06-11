@@ -1,0 +1,22 @@
+{
+    "id": "c3d7876b-a4a0-42f1-aaef-8545f97e836b",
+    "scriptName": "测试正则",
+    "findRegex": "这里是查找正则表达式",
+    "replaceString": "这里是替换的字符。默认的提示文本：\n```\n使用 {{match}} 包含来自“查找正则表达式”或“$1”、“$2”等的匹配文本作为捕获组。\n```",
+    "trimStrings": [
+        "这里是修剪正则表达式中不需要的部分。默认的提示词文本：",
+        "```",
+        "在替换之前全局修剪正则表达式匹配中任何不需要的部分。用回车键分隔每个元素。",
+        "```"
+    ],
+    "placement": [
+        1
+    ],
+    "disabled": false,
+    "markdownOnly": true,
+    "promptOnly": false,
+    "runOnEdit": true,
+    "substituteRegex": 0,
+    "minDepth": null,
+    "maxDepth": null
+}

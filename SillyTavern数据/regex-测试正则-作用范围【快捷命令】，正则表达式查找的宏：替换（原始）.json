@@ -1,0 +1,17 @@
+{
+    "id": "92185a69-e6cb-4754-b040-c7885e39c18c",
+    "scriptName": "测试正则-作用范围【快捷命令】，正则表达式查找的宏：替换（原始）",
+    "findRegex": "",
+    "replaceString": "",
+    "trimStrings": [],
+    "placement": [
+        3
+    ],
+    "disabled": false,
+    "markdownOnly": true,
+    "promptOnly": false,
+    "runOnEdit": true,
+    "substituteRegex": 1,
+    "minDepth": null,
+    "maxDepth": null
+}

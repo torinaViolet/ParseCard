@@ -1,0 +1,17 @@
+{
+    "id": "a3f464d8-61a2-4cb8-9a87-52d1d286efd9",
+    "scriptName": "测试正则-作用范围【AI输出】，正则表达式查找的宏：不替换",
+    "findRegex": "",
+    "replaceString": "",
+    "trimStrings": [],
+    "placement": [
+        2
+    ],
+    "disabled": false,
+    "markdownOnly": true,
+    "promptOnly": false,
+    "runOnEdit": true,
+    "substituteRegex": 0,
+    "minDepth": null,
+    "maxDepth": null
+}

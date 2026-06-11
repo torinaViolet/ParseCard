@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.test-dist/
+.npm-cache/
+*.tgz
+
+.idea/
+.vscode/
+
+*.log
+.DS_Store
+Thumbs.db
