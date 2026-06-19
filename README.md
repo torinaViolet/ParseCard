@@ -1,6 +1,6 @@
 # ParseCard v2.0
 
-**SillyTavern 角色卡、世界书、正则脚本的解析与序列化工具库**
+**SillyTavern 角色卡、世界书、正则脚本、OpenAI 预设的解析与序列化工具库**
 
 TypeScript 实现，面向对象设计，零外部依赖，核心层同时支持 Node.js 和浏览器环境。
 
@@ -9,10 +9,11 @@ TypeScript 实现，面向对象设计，零外部依赖，核心层同时支持
 - 🎭 **角色卡** — 面向对象的`CharacterCard` 类，支持 V2/V3 格式自动兼容，getter/setter 自动同步顶层与data冗余字段
 - 📖 **世界书** — `WorldBook` + `WorldBookEntry` 类，独立/内嵌两种格式自动检测、统一解析、互转
 - 🔧 **正则脚本** — `RegexScript` 类，支持独立文件和角色卡内嵌
-- 🖼️ **PNG 读写** — 从 PNG tEXt chunk 中读写角色卡数据，支持无底图生成
+- 🧩 **OpenAI 预设** — `OpenAIPreset` 类，支持 SillyTavern Chat Completion 预设的 prompts 增删改查、启用状态和排序管理
+- 🖼️ **PNG 读写** — 从 PNG tEXt chunk 中读写角色卡数据，支持 `ccv3` / `chara` 兼容和无底图生成
 - 📂 **文件 I/O** — 一行代码加载 PNG / JSON 文件，同步 + 异步双版本
 - 🔗 **链式调用** — `card.bindWorldBook(wb).addRegexScript(script)`
-- 🛡️ **鲁棒性** — 字段缺失、类型错误、null 值全面容错
+- 🛡️ **鲁棒性** — 字段缺失、类型错误、null 值全面容错，并尽量保留未知字段以支持 round-trip
 - 🌐 **跨环境** — 核心层 `parsecard` 不依赖 Node.js API，浏览器可直接使用；文件 I/O 通过 `parsecard/node` 按需引入
 
 ## 安装
@@ -150,6 +151,41 @@ const cloned = newScript.clone();
 const output = newScript.toJSON();
 ```
 
+### OpenAI / Chat Completion 预设
+
+```typescript
+import { OpenAIPreset } from 'parsecard';
+import { loadOpenAIPreset, saveOpenAIPreset } from 'parsecard/node';
+
+// 创建一个 SillyTavern 可直接使用的默认预设
+const preset = OpenAIPreset.create({ name: '我的预设' });
+
+// 内置条目包括 Main Prompt、World Info (before)、Char Description 等
+preset.updatePrompt('main', {
+    content: 'Write {{char}}\'s next reply in character.',
+});
+
+// 添加、移动、禁用自定义提示词
+preset.addPrompt(
+    { identifier: 'style', name: 'Style Guide', role: 'system', content: 'Keep replies concise.' },
+    { after: 'main', enabled: true },
+);
+preset.movePrompt('style', 1);
+preset.setPromptEnabled('enhanceDefinitions', false);
+
+// 常用外层参数可以直接读写；其它参数用通用 getter/setter 保留
+preset.temperature = 0.8;
+preset.maxTokens = 600;
+preset.setSetting('custom_provider_field', { keep: true });
+
+saveOpenAIPreset(preset, '我的预设.json');
+
+// 读取已有导出的 SillyTavern 预设，不会自动改写原结构
+const imported = loadOpenAIPreset('导出的预设.json');
+imported.ensureDefaultPrompts();      // 需要时补齐 ST 默认内置条目
+imported.resetDefaultPromptOrder();   // 需要时恢复内置条目的默认顺序
+```
+
 ### 绑定操作（链式调用）
 
 ```typescript
@@ -186,6 +222,9 @@ import {
     // 正则脚本
     loadRegexScript, loadRegexScriptAsync,
     saveRegexScript, saveRegexScriptAsync,
+    // OpenAI / Chat Completion 预设
+    loadOpenAIPreset, loadOpenAIPresetAsync,
+    saveOpenAIPreset, saveOpenAIPresetAsync,
 } from 'parsecard/node';
 ```
 
@@ -193,10 +232,10 @@ import {
 
 ```typescript
 // 核心功能（浏览器 + Node.js 通用）
-import { CharacterCard, WorldBook, RegexScript } from 'parsecard';
+import { CharacterCard, WorldBook, RegexScript, OpenAIPreset } from 'parsecard';
 
 // 文件 I/O（仅 Node.js）
-import { loadCharacterCard, saveCharacterCard } from 'parsecard/node';
+import { loadCharacterCard, saveCharacterCard, loadOpenAIPreset, saveOpenAIPreset } from 'parsecard/node';
 ```
 
 ### 时间戳兼容
@@ -287,6 +326,35 @@ import { loadCharacterCard, saveCharacterCard } from 'parsecard/node';
 | `.enable()` / `.disable()` | 启用/禁用 |
 | `.toJSON()` | 序列化|
 | `.clone()` | 深拷贝（生成新 ID） |
+
+### `OpenAIPreset`
+
+| 方法 / 属性 | 说明 |
+|---|---|
+| `OpenAIPreset.fromJSON(raw)` | 从 SillyTavern OpenAI / Chat Completion 预设 JSON 解析 |
+| `OpenAIPreset.create(overrides?)` | 创建带默认内置 prompts 和默认 prompt_order 的可用预设 |
+| `.name` | 预设名称（部分 SillyTavern 文件可能没有该字段） |
+| `.prompts`, `.promptOrder` | prompts 定义列表和 prompt_order 分组 |
+| `.defaultCharacterId` | 默认操作的 prompt_order 分组，优先使用 `100001` |
+| `.getPrompt(identifier)` | 获取 prompt |
+| `.hasPrompt(identifier)` | 判断 prompt 是否存在 |
+| `.searchPrompts(query)` | 按 identifier、名称或内容搜索 |
+| `.listPromptEntries(options?)` | 按 prompt_order 列出条目，可包含未排序 prompts |
+| `.addPrompt(prompt, options?)` | 新增 prompt，并可插入到指定位置 |
+| `.updatePrompt(identifier, updates)` | 修改 prompt；修改 identifier 时会同步 order 引用 |
+| `.removePrompt(identifier, removeFromOrder?)` | 删除 prompt，并默认移除 order 引用 |
+| `.clonePrompt(identifier, overrides?, options?)` | 复制 prompt 并生成新 identifier |
+| `.isPromptEnabled(identifier, characterId?)` | 查询启用状态 |
+| `.setPromptEnabled(identifier, enabled, characterId?)` | 设置启用状态 |
+| `.movePrompt(identifier, index, characterId?)` | 调整排序 |
+| `.removePromptFromOrder(identifier, characterId?)` | 仅移除排序引用，不删除 prompt 本体 |
+| `.ensureDefaultPrompts(characterId?)` | 补齐 SillyTavern 默认内置 prompts，不覆盖已有内容 |
+| `.resetDefaultPromptOrder(characterId?)` | 恢复内置 prompts 默认顺序，自定义条目追加在后 |
+| `.temperature`, `.topP`, `.maxContext`, `.maxTokens` | 常用外层参数 getter/setter |
+| `.reasoningEffort`, `.showThoughts` | 推理相关外层参数 getter/setter |
+| `.getSetting(key)` / `.setSetting(key, value)` | 通用外层参数读写；传 `undefined` 会删除字段 |
+| `.toJSON()` | 导出 SillyTavern 兼容 JSON |
+| `.clone()` | 深拷贝 |
 
 ## 枚举常量
 

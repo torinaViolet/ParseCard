@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.0.3 - 2026-06-19
+
+- Document OpenAI / Chat Completion preset management, default SillyTavern prompt entries, common preset settings, and Node.js preset I/O in the README.
+
 ## 2.0.2 - 2026-06-19
 
 - Support SillyTavern `ccv3` PNG metadata, preferring `ccv3` over `chara` when reading.

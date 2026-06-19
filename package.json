@@ -1,6 +1,6 @@
 {
     "name": "parsecard",
-    "version": "2.0.2",
+    "version": "2.0.3",
     "description": "SillyTavern 角色卡、世界书、正则脚本的解析与序列化工具库（面向对象，TypeScript）",
     "type": "module",
     "main": "./dist/index.js",
