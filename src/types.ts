@@ -29,6 +29,8 @@ export interface CharacterCardExtensions {
     depth_prompt: DepthPrompt;
     /** 正则脚本列表（可选） */
     regex_scripts?: RegexScriptData[];
+    /** 第三方或 SillyTavern 新增的扩展字段 */
+    [key: string]: unknown;
 }
 
 /** 角色卡核心数据 */
@@ -59,9 +61,14 @@ export interface CharacterCardData {
     character_version: string;
     /** 替代问候语列表 */
     alternate_greetings: string[];
+    /** 群聊专用问候语列表（SillyTavern 扩展字段） */
+    group_only_greetings?: string[];
     /** 扩展数据 */
-    extensions: CharacterCardExtensions;/** 内嵌世界书（可选） */
+    extensions: CharacterCardExtensions;
+    /** 内嵌世界书（可选） */
     character_book?: WorldBookData;
+    /** 第三方或 SillyTavern 新增的数据字段 */
+    [key: string]: unknown;
 }
 
 /** 完整角色卡原始数据 */
@@ -176,6 +183,12 @@ export interface WorldBookEntryData {
     matchCreatorNotes: boolean;
     /** 角色过滤器（独立世界书可用，null=无过滤） */
     characterFilter: CharacterFilter | null;
+    /** 条目扩展字段（独立格式的 extensions，或内嵌格式 extensions 中的未知字段） */
+    extensions?: Record<string, unknown>;
+    /** 独立世界书条目的未知顶层字段 */
+    standaloneExtras?: Record<string, unknown>;
+    /** 内嵌世界书条目的未知顶层字段 */
+    embeddedExtras?: Record<string, unknown>;
 }
 
 /** 世界书（统一格式） */
@@ -184,6 +197,22 @@ export interface WorldBookData {
     name: string;
     /** 条目列表 */
     entries: WorldBookEntryData[];
+    /** 世界书描述 */
+    description?: string;
+    /** 是否递归扫描（独立格式 camelCase） */
+    recursiveScanning?: boolean;
+    /** 扫描深度 */
+    scanDepth?: number;
+    /** Token 预算 */
+    tokenBudget?: number;
+    /** SillyTavern 导入来源等原始信息 */
+    originalData?: unknown;
+    /** 内嵌 character_book 的扩展字段 */
+    extensions?: Record<string, unknown>;
+    /** 独立世界书未知顶层字段 */
+    standaloneExtras?: Record<string, unknown>;
+    /** 内嵌 character_book 未知顶层字段 */
+    embeddedExtras?: Record<string, unknown>;
 }
 
 // ============================================================
@@ -218,6 +247,95 @@ export interface RegexScriptData {
     minDepth: number | null;
     /** 最大深度（null=无限制） */
     maxDepth: number | null;
+}
+
+// ============================================================
+//  OpenAI / Chat Completion 预设
+// ============================================================
+
+export type PromptRole = 'system' | 'user' | 'assistant' | string;
+
+export interface ChatCompletionPrompt {
+    /** Prompt 稳定标识，也是 prompt_order 的引用键 */
+    identifier: string;
+    /** UI 显示名称 */
+    name: string;
+    /** 消息角色 */
+    role?: PromptRole;
+    /** Prompt 内容，marker prompt 可为空 */
+    content?: string;
+    /** 是否为系统内置 prompt */
+    system_prompt?: boolean;
+    /** 是否为占位/锚点 prompt */
+    marker?: boolean;
+    /** 相对/绝对注入位置 */
+    injection_position?: number;
+    /** 绝对注入深度 */
+    injection_depth?: number;
+    /** 同深度排序 */
+    injection_order?: number;
+    /** 触发类型列表 */
+    injection_trigger?: string[];
+    /** 是否禁止角色卡覆盖 */
+    forbid_overrides?: boolean;
+    /** 部分导出格式中的提示词级启用状态；SillyTavern 主要以 prompt_order 为准 */
+    enabled?: boolean;
+    /** SillyTavern 新增字段或第三方字段 */
+    [key: string]: unknown;
+}
+
+export interface PromptOrderEntry {
+    /** Prompt identifier */
+    identifier: string;
+    /** 当前排序分组下是否启用 */
+    enabled: boolean;
+    /** SillyTavern 新增字段或第三方字段 */
+    [key: string]: unknown;
+}
+
+export interface PromptOrderGroup {
+    /** SillyTavern character_id；100001 通常是当前全局分组 */
+    character_id: string | number;
+    /** 排序和启用状态 */
+    order: PromptOrderEntry[];
+    /** SillyTavern 新增字段或第三方字段 */
+    [key: string]: unknown;
+}
+
+export interface OpenAIPresetData {
+    /** OpenAI Prompt Manager prompt 定义表 */
+    prompts?: ChatCompletionPrompt[];
+    /** Prompt 排序/启用状态分组 */
+    prompt_order?: PromptOrderGroup[];
+    /** 预设扩展字段 */
+    extensions?: Record<string, unknown>;
+    /** 预设名称（部分来源可能没有该字段，文件名才是名称） */
+    name?: string;
+    /** 其它 OpenAI preset 生成参数和 provider 字段 */
+    [key: string]: unknown;
+}
+
+export interface PromptListItem {
+    identifier: string;
+    prompt: ChatCompletionPrompt;
+    order?: PromptOrderEntry;
+    index: number;
+    enabled: boolean;
+    ordered: boolean;
+}
+
+export interface PromptListOptions {
+    characterId?: string | number;
+    includeUnordered?: boolean;
+}
+
+export interface AddPromptOptions {
+    characterId?: string | number;
+    enabled?: boolean;
+    index?: number;
+    before?: string;
+    after?: string;
+    includeInOrder?: boolean;
 }
 
 // ============================================================

@@ -19,6 +19,7 @@ import { extname } from 'node:path';
 import { CharacterCard } from './CharacterCard.js';
 import { WorldBook } from './WorldBook.js';
 import { RegexScript } from './RegexScript.js';
+import { OpenAIPreset } from './OpenAIPreset.js';
 import { FileIOError, InvalidFormatError } from './errors.js';
 import type { SerializeOptions, SaveOptions } from './types.js';
 
@@ -294,5 +295,61 @@ export async function saveRegexScriptAsync(script: RegexScript, filePath: string
     } catch (e) {
         if (e instanceof FileIOError) throw e;
         throw new FileIOError(`保存正则脚本失败 (${filePath}): ${(e as Error).message}`);
+    }
+}
+
+// ============================================================
+//  OpenAI Preset 文件操作
+// ============================================================
+
+/**
+ * 从 JSON 文件加载 OpenAI / Chat Completion 预设（同步）
+ */
+export function loadOpenAIPreset(filePath: string): OpenAIPreset {
+    try {
+        const text = readFileSync(filePath, 'utf-8');
+        const raw = JSON.parse(text);
+        return OpenAIPreset.fromJSON(raw);
+    } catch (e) {
+        if (e instanceof FileIOError) throw e;
+        throw new FileIOError(`加载 OpenAI 预设失败 (${filePath}): ${(e as Error).message}`);
+    }
+}
+
+/**
+ * 从 JSON 文件加载 OpenAI / Chat Completion 预设（异步）
+ */
+export async function loadOpenAIPresetAsync(filePath: string): Promise<OpenAIPreset> {
+    try {
+        const text = await readFile(filePath, 'utf-8');
+        const raw = JSON.parse(text);
+        return OpenAIPreset.fromJSON(raw);
+    } catch (e) {
+        if (e instanceof FileIOError) throw e;
+        throw new FileIOError(`加载 OpenAI 预设失败 (${filePath}): ${(e as Error).message}`);
+    }
+}
+
+/**
+ * 保存 OpenAI / Chat Completion 预设到 JSON 文件（同步）
+ */
+export function saveOpenAIPreset(preset: OpenAIPreset, filePath: string): void {
+    try {
+        writeFileSync(filePath, JSON.stringify(preset.toJSON(), null, 2), 'utf-8');
+    } catch (e) {
+        if (e instanceof FileIOError) throw e;
+        throw new FileIOError(`保存 OpenAI 预设失败 (${filePath}): ${(e as Error).message}`);
+    }
+}
+
+/**
+ * 保存 OpenAI / Chat Completion 预设到 JSON 文件（异步）
+ */
+export async function saveOpenAIPresetAsync(preset: OpenAIPreset, filePath: string): Promise<void> {
+    try {
+        await writeFile(filePath, JSON.stringify(preset.toJSON(), null, 2), 'utf-8');
+    } catch (e) {
+        if (e instanceof FileIOError) throw e;
+        throw new FileIOError(`保存 OpenAI 预设失败 (${filePath}): ${(e as Error).message}`);
     }
 }

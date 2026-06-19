@@ -22,6 +22,131 @@ import {
     asBooleanOrNumber, deepClone,
 } from './utils.js';
 
+interface WorldBookMetadata {
+    description?: string;
+    recursiveScanning?: boolean;
+    scanDepth?: number;
+    tokenBudget?: number;
+    originalData?: unknown;
+    extensions?: Record<string, unknown>;
+    standaloneExtras?: Record<string, unknown>;
+    embeddedExtras?: Record<string, unknown>;
+}
+
+const STANDALONE_ENTRY_KEYS = new Set([
+    'uid', 'key', 'keysecondary', 'comment', 'content', 'constant', 'vectorized',
+    'selective', 'selectiveLogic', 'addMemo', 'order', 'position', 'disable',
+    'ignoreBudget', 'excludeRecursion', 'preventRecursion', 'delayUntilRecursion',
+    'probability', 'useProbability', 'depth', 'outletName', 'group', 'groupOverride',
+    'groupWeight', 'scanDepth', 'caseSensitive', 'matchWholeWords', 'useGroupScoring',
+    'automationId', 'role', 'sticky', 'cooldown', 'delay', 'triggers', 'displayIndex',
+    'matchPersonaDescription', 'matchCharacterDescription', 'matchCharacterPersonality',
+    'matchCharacterDepthPrompt', 'matchScenario', 'matchCreatorNotes', 'characterFilter',
+    'extensions',
+]);
+
+const EMBEDDED_ENTRY_KEYS = new Set([
+    'id', 'keys', 'secondary_keys', 'comment', 'content', 'constant', 'selective',
+    'insertion_order', 'enabled', 'position', 'use_regex', 'extensions',
+]);
+
+const EMBEDDED_ENTRY_EXTENSION_KEYS = new Set([
+    'position', 'exclude_recursion', 'display_index', 'probability', 'useProbability',
+    'depth', 'selectiveLogic', 'outlet_name', 'group', 'group_override', 'group_weight',
+    'prevent_recursion', 'delay_until_recursion', 'scan_depth', 'match_whole_words',
+    'use_group_scoring', 'case_sensitive', 'automation_id', 'role', 'vectorized',
+    'sticky', 'cooldown', 'delay', 'match_persona_description',
+    'match_character_description', 'match_character_personality',
+    'match_character_depth_prompt', 'match_scenario', 'match_creator_notes', 'triggers',
+    'ignore_budget',
+]);
+
+const STANDALONE_BOOK_KEYS = new Set([
+    'entries', 'name', 'description', 'recursiveScanning', 'scanDepth',
+    'tokenBudget', 'originalData',
+]);
+
+const EMBEDDED_BOOK_KEYS = new Set([
+    'entries', 'name', 'description', 'scan_depth', 'token_budget',
+    'recursive_scanning', 'extensions',
+]);
+
+function hasOwn(obj: object | undefined, key: string): boolean {
+    return !!obj && Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function cloneValue<T>(value: T): T {
+    return value === undefined ? value : deepClone(value);
+}
+
+function cloneRecord(value: Record<string, unknown> | undefined): Record<string, unknown> {
+    return value ? deepClone(value) : {};
+}
+
+function cloneRecordIfObject(value: unknown): Record<string, unknown> | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return undefined;
+    }
+    return deepClone(value as Record<string, unknown>);
+}
+
+function collectExtras(
+    source: Record<string, unknown>,
+    knownKeys: Set<string>,
+): Record<string, unknown> | undefined {
+    const extras: Record<string, unknown> = {};
+    for (const key of Object.keys(source)) {
+        if (knownKeys.has(key)) continue;
+        extras[key] = cloneValue(source[key]);
+    }
+    return Object.keys(extras).length > 0 ? extras : undefined;
+}
+
+function setIfDefined(target: Record<string, unknown>, key: string, value: unknown): void {
+    if (value !== undefined) {
+        target[key] = cloneValue(value);
+    }
+}
+
+function optionalNumber(value: unknown): number | undefined {
+    return asNumber(value) ?? undefined;
+}
+
+function parseStandaloneBookMetadata(obj: Record<string, unknown>): WorldBookMetadata {
+    return {
+        description: hasOwn(obj, 'description') ? asString(obj.description) : undefined,
+        recursiveScanning: hasOwn(obj, 'recursiveScanning') ? asBoolean(obj.recursiveScanning) : undefined,
+        scanDepth: hasOwn(obj, 'scanDepth') ? optionalNumber(obj.scanDepth) : undefined,
+        tokenBudget: hasOwn(obj, 'tokenBudget') ? optionalNumber(obj.tokenBudget) : undefined,
+        originalData: hasOwn(obj, 'originalData') ? cloneValue(obj.originalData) : undefined,
+        standaloneExtras: collectExtras(obj, STANDALONE_BOOK_KEYS),
+    };
+}
+
+function parseEmbeddedBookMetadata(obj: Record<string, unknown>): WorldBookMetadata {
+    return {
+        description: hasOwn(obj, 'description') ? asString(obj.description) : undefined,
+        recursiveScanning: hasOwn(obj, 'recursive_scanning') ? asBoolean(obj.recursive_scanning) : undefined,
+        scanDepth: hasOwn(obj, 'scan_depth') ? optionalNumber(obj.scan_depth) : undefined,
+        tokenBudget: hasOwn(obj, 'token_budget') ? optionalNumber(obj.token_budget) : undefined,
+        extensions: cloneRecordIfObject(obj.extensions),
+        embeddedExtras: collectExtras(obj, EMBEDDED_BOOK_KEYS),
+    };
+}
+
+function metadataFromData(data: WorldBookData): WorldBookMetadata {
+    return {
+        description: data.description,
+        recursiveScanning: data.recursiveScanning,
+        scanDepth: data.scanDepth,
+        tokenBudget: data.tokenBudget,
+        originalData: cloneValue(data.originalData),
+        extensions: data.extensions ? deepClone(data.extensions) : undefined,
+        standaloneExtras: data.standaloneExtras ? deepClone(data.standaloneExtras) : undefined,
+        embeddedExtras: data.embeddedExtras ? deepClone(data.embeddedExtras) : undefined,
+    };
+}
+
 //============================================================
 //  WorldBookEntry 类
 // ============================================================
@@ -109,6 +234,8 @@ export class WorldBookEntry {
             matchScenario: asBoolean(obj.matchScenario),
             matchCreatorNotes: asBoolean(obj.matchCreatorNotes),
             characterFilter,
+            extensions: cloneRecordIfObject(obj.extensions),
+            standaloneExtras: collectExtras(obj, STANDALONE_ENTRY_KEYS),
         }));
     }
 
@@ -151,7 +278,7 @@ export class WorldBookEntry {
             preventRecursion: asBoolean(ext.prevent_recursion),
             delayUntilRecursion: asBooleanOrNumber(ext.delay_until_recursion),
             scanDepth: asNullableNumber(ext.scan_depth),
-            caseSensitive: asNullableBoolean(ext.case_sensitive),
+            caseSensitive: asNullableBoolean(ext.case_sensitive, asNullableBoolean(obj.case_sensitive)),
             matchWholeWords: asNullableBoolean(ext.match_whole_words),
             useGroupScoring: asNullableBoolean(ext.use_group_scoring),
             automationId: asString(ext.automation_id),
@@ -173,6 +300,8 @@ export class WorldBookEntry {
             matchScenario: asBoolean(ext.match_scenario),
             matchCreatorNotes: asBoolean(ext.match_creator_notes),
             characterFilter: null,
+            extensions: collectExtras(ext, EMBEDDED_ENTRY_EXTENSION_KEYS),
+            embeddedExtras: collectExtras(obj, EMBEDDED_ENTRY_KEYS),
         }));
     }
 
@@ -358,6 +487,7 @@ export class WorldBookEntry {
     /** 序列化为独立世界书条目格式 */
     toStandaloneJSON(): Record<string, unknown> {
         const result: Record<string, unknown> = {
+            ...cloneRecord(this._data.standaloneExtras),
             uid: this._data.uid,
             key: deepClone(this._data.keys),
             keysecondary: deepClone(this._data.secondary_keys),
@@ -404,6 +534,9 @@ export class WorldBookEntry {
         if (this._data.characterFilter) {
             result.characterFilter = deepClone(this._data.characterFilter);
         }
+        if (this._data.extensions) {
+            result.extensions = deepClone(this._data.extensions);
+        }
 
         return result;
     }
@@ -414,7 +547,43 @@ export class WorldBookEntry {
             ? EmbeddedWorldBookPosition.BEFORE_CHAR
             : EmbeddedWorldBookPosition.AFTER_CHAR;
 
-        return {
+        const extensions: Record<string, unknown> = {
+            ...cloneRecord(this._data.extensions),
+            position: this._data.position,
+            exclude_recursion: this._data.excludeRecursion,
+            display_index: this._data.displayIndex,
+            probability: this._data.probability,
+            useProbability: this._data.useProbability,
+            depth: this._data.depth,
+            selectiveLogic: this._data.selectiveLogic,
+            outlet_name: this._data.outletName,
+            group: this._data.group,
+            group_override: this._data.groupOverride,
+            group_weight: this._data.groupWeight,
+            prevent_recursion: this._data.preventRecursion,
+            delay_until_recursion: this._data.delayUntilRecursion,
+            scan_depth: this._data.scanDepth,
+            match_whole_words: this._data.matchWholeWords,
+            use_group_scoring: this._data.useGroupScoring,
+            case_sensitive: this._data.caseSensitive,
+            automation_id: this._data.automationId,
+            role: this._data.role,
+            vectorized: this._data.vectorized,
+            sticky: this._data.sticky,
+            cooldown: this._data.cooldown,
+            delay: this._data.delay,
+            match_persona_description: this._data.matchPersonaDescription,
+            match_character_description: this._data.matchCharacterDescription,
+            match_character_personality: this._data.matchCharacterPersonality,
+            match_character_depth_prompt: this._data.matchCharacterDepthPrompt,
+            match_scenario: this._data.matchScenario,
+            match_creator_notes: this._data.matchCreatorNotes,
+            triggers: deepClone(this._data.triggers),
+            ignore_budget: this._data.ignoreBudget,
+        };
+
+        const result: Record<string, unknown> = {
+            ...cloneRecord(this._data.embeddedExtras),
             id: this._data.uid,
             keys: deepClone(this._data.keys),
             secondary_keys: deepClone(this._data.secondary_keys),
@@ -426,40 +595,14 @@ export class WorldBookEntry {
             enabled: this._data.enabled,
             position: positionStr,
             use_regex: this._data.use_regex,
-            extensions: {
-                position: this._data.position,
-                exclude_recursion: this._data.excludeRecursion,
-                display_index: this._data.displayIndex,
-                probability: this._data.probability,
-                useProbability: this._data.useProbability,
-                depth: this._data.depth,
-                selectiveLogic: this._data.selectiveLogic,
-                outlet_name: this._data.outletName,
-                group: this._data.group,
-                group_override: this._data.groupOverride,
-                group_weight: this._data.groupWeight,
-                prevent_recursion: this._data.preventRecursion,
-                delay_until_recursion: this._data.delayUntilRecursion,
-                scan_depth: this._data.scanDepth,
-                match_whole_words: this._data.matchWholeWords,
-                use_group_scoring: this._data.useGroupScoring,
-                case_sensitive: this._data.caseSensitive,
-                automation_id: this._data.automationId,
-                role: this._data.role,
-                vectorized: this._data.vectorized,
-                sticky: this._data.sticky,
-                cooldown: this._data.cooldown,
-                delay: this._data.delay,
-                match_persona_description: this._data.matchPersonaDescription,
-                match_character_description: this._data.matchCharacterDescription,
-                match_character_personality: this._data.matchCharacterPersonality,
-                match_character_depth_prompt: this._data.matchCharacterDepthPrompt,
-                match_scenario: this._data.matchScenario,
-                match_creator_notes: this._data.matchCreatorNotes,
-                triggers: deepClone(this._data.triggers),
-                ignore_budget: this._data.ignoreBudget,
-            },
+            extensions,
         };
+
+        if (hasOwn(this._data.embeddedExtras, 'case_sensitive')) {
+            result.case_sensitive = this._data.caseSensitive;
+        }
+
+        return result;
     }
 
     // ============================================================
@@ -536,10 +679,12 @@ export class WorldBookEntry {
 export class WorldBook {
     private _name: string;
     private _entries: WorldBookEntry[];
+    private _metadata: WorldBookMetadata;
 
-    constructor(name: string = '', entries: WorldBookEntry[] = []) {
+    constructor(name: string = '', entries: WorldBookEntry[] = [], metadata: WorldBookMetadata = {}) {
         this._name = name;
         this._entries = entries;
+        this._metadata = deepClone(metadata);
     }
 
     // ============================================================
@@ -569,7 +714,7 @@ export class WorldBook {
             return WorldBook.fromStandaloneJSON(raw);
         }
 
-        return new WorldBook(asString(obj.name));
+        return new WorldBook(asString(obj.name), [], parseStandaloneBookMetadata(obj));
     }
 
     /** 解析独立世界书格式 */
@@ -590,7 +735,7 @@ export class WorldBook {
 
         entries.sort((a, b) => a.displayIndex - b.displayIndex);
 
-        return new WorldBook(asString(obj.name), entries);
+        return new WorldBook(asString(obj.name), entries, parseStandaloneBookMetadata(obj));
     }
 
     /** 解析内嵌世界书格式 */
@@ -610,13 +755,13 @@ export class WorldBook {
 
         entries.sort((a, b) => a.displayIndex - b.displayIndex);
 
-        return new WorldBook(asString(obj.name), entries);
+        return new WorldBook(asString(obj.name), entries, parseEmbeddedBookMetadata(obj));
     }
 
     /** 从WorldBookData 创建 */
     static fromData(data: WorldBookData): WorldBook {
         const entries = data.entries.map(e => new WorldBookEntry(deepClone(e)));
-        return new WorldBook(data.name, entries);
+        return new WorldBook(data.name, entries, metadataFromData(data));
     }
 
     // ============================================================
@@ -735,6 +880,8 @@ export class WorldBook {
     merge(other: WorldBook, name?: string): WorldBook {
         const merged = new WorldBook(
             name ?? (this._name || other._name || ''),
+            [],
+            this._metadata,
         );
         const allEntries = [
             ...this._entries.map(e => e.clone()),
@@ -753,6 +900,7 @@ export class WorldBook {
         return new WorldBook(
             this._name,
             this._entries.map(e => e.clone()),
+            this._metadata,
         );
     }
 
@@ -766,15 +914,37 @@ export class WorldBook {
         for (const entry of this._entries) {
             entries[String(entry.uid)] = entry.toStandaloneJSON();
         }
-        return { entries };
+        const result: Record<string, unknown> = {
+            ...cloneRecord(this._metadata.standaloneExtras),
+            entries,
+        };
+
+        if (this._name) {
+            result.name = this._name;
+        }
+        setIfDefined(result, 'description', this._metadata.description);
+        setIfDefined(result, 'recursiveScanning', this._metadata.recursiveScanning);
+        setIfDefined(result, 'scanDepth', this._metadata.scanDepth);
+        setIfDefined(result, 'tokenBudget', this._metadata.tokenBudget);
+        setIfDefined(result, 'originalData', this._metadata.originalData);
+
+        return result;
     }
 
     /** 导出为内嵌世界书格式 */
     toEmbeddedJSON(): Record<string, unknown> {
-        return {
+        const result: Record<string, unknown> = {
+            ...cloneRecord(this._metadata.embeddedExtras),
             entries: this._entries.map(e => e.toEmbeddedJSON()),
             name: this._name,
+            extensions: cloneRecord(this._metadata.extensions),
         };
+        setIfDefined(result, 'description', this._metadata.description);
+        setIfDefined(result, 'scan_depth', this._metadata.scanDepth);
+        setIfDefined(result, 'token_budget', this._metadata.tokenBudget);
+        setIfDefined(result, 'recursive_scanning', this._metadata.recursiveScanning);
+
+        return result;
     }
 
     /** 默认 JSON 序列化（独立格式） */
@@ -784,10 +954,26 @@ export class WorldBook {
 
     /** 导出为 WorldBookData */
     toData(): WorldBookData {
-        return {
+        const data: WorldBookData = {
             name: this._name,
             entries: this._entries.map(e => e.toData()),
         };
+        const dataRecord = data as unknown as Record<string, unknown>;
+        setIfDefined(dataRecord, 'description', this._metadata.description);
+        setIfDefined(dataRecord, 'recursiveScanning', this._metadata.recursiveScanning);
+        setIfDefined(dataRecord, 'scanDepth', this._metadata.scanDepth);
+        setIfDefined(dataRecord, 'tokenBudget', this._metadata.tokenBudget);
+        setIfDefined(dataRecord, 'originalData', this._metadata.originalData);
+        if (this._metadata.extensions) {
+            data.extensions = deepClone(this._metadata.extensions);
+        }
+        if (this._metadata.standaloneExtras) {
+            data.standaloneExtras = deepClone(this._metadata.standaloneExtras);
+        }
+        if (this._metadata.embeddedExtras) {
+            data.embeddedExtras = deepClone(this._metadata.embeddedExtras);
+        }
+        return data;
     }
 
     // ============================================================

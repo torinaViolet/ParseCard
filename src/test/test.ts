@@ -13,6 +13,10 @@ import {
     WorldBook,
     WorldBookEntry,
     RegexScript,
+    OpenAIPreset,
+    DEFAULT_PROMPT_ORDER_CHARACTER_ID,
+    DEFAULT_OPENAI_PROMPTS,
+    DEFAULT_OPENAI_PROMPT_ORDER,
     //枚举
     CharacterCardSpec,
     WorldBookEntryPosition,
@@ -30,6 +34,8 @@ import {
     // PNG
     createMinimalPNG,
     hasCharaInPNG,
+    readJsonFromPNG,
+    writeJsonToPNG,
 } from '../index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -214,6 +220,87 @@ assert(standaloneEntries['0'].key !== undefined, '导出独立格式：使用 ke
 assert(standaloneEntries['0'].order === 100, '导出独立格式：使用 order 字段');
 assert(standaloneEntries['0'].disable === false, '导出独立格式：使用 disable 字段');
 
+// 世界书 metadata 与未知字段 round-trip
+const rawStandaloneWithMetadata = {
+    name: '元数据世界书',
+    description: '独立世界书描述',
+    recursiveScanning: true,
+    scanDepth: 8,
+    tokenBudget: 2048,
+    originalData: { source: 'imported', version: 1 },
+    customBookTopLevel: { keep: true },
+    entries: {
+        '0': {
+            uid: 0,
+            key: ['元数据关键词'],
+            keysecondary: [],
+            comment: '元数据条目',
+            content: '元数据内容',
+            extensions: { vendor: 'standalone-entry', flag: true },
+            customStandaloneEntryField: '保留我',
+        },
+    },
+};
+const standaloneWithMetadata = WorldBook.fromStandaloneJSON(rawStandaloneWithMetadata);
+const standaloneWithMetadataOut = standaloneWithMetadata.toStandaloneJSON() as Record<string, any>;
+assert(standaloneWithMetadataOut.name === '元数据世界书', '独立世界书保留 name');
+assert(standaloneWithMetadataOut.description === '独立世界书描述', '独立世界书保留 description');
+assert(standaloneWithMetadataOut.recursiveScanning === true, '独立世界书保留 recursiveScanning');
+assert(standaloneWithMetadataOut.scanDepth === 8, '独立世界书保留 scanDepth');
+assert(standaloneWithMetadataOut.tokenBudget === 2048, '独立世界书保留 tokenBudget');
+assert(standaloneWithMetadataOut.originalData.source === 'imported', '独立世界书保留 originalData');
+assert(standaloneWithMetadataOut.customBookTopLevel.keep === true, '独立世界书保留未知顶层字段');
+assert(standaloneWithMetadataOut.entries['0'].extensions.vendor === 'standalone-entry', '独立条目保留 extensions');
+assert(standaloneWithMetadataOut.entries['0'].customStandaloneEntryField === '保留我', '独立条目保留未知字段');
+
+const rawEmbeddedWithMetadata = {
+    name: '内嵌元数据世界书',
+    description: '内嵌世界书描述',
+    scan_depth: 6,
+    token_budget: 1024,
+    recursive_scanning: false,
+    extensions: { bookVendor: 'embedded-book' },
+    custom_embedded_book_field: '保留内嵌顶层',
+    entries: [
+        {
+            id: 0,
+            keys: ['内嵌关键词'],
+            secondary_keys: [],
+            comment: '内嵌条目',
+            content: '内嵌内容',
+            constant: false,
+            selective: true,
+            insertion_order: 90,
+            enabled: true,
+            position: 'before_char',
+            use_regex: true,
+            case_sensitive: true,
+            priority: 7,
+            name: '旧版内嵌条目名称',
+            extensions: {
+                position: 0,
+                depth: 2,
+                role: 1,
+                custom_extension_field: { keep: 'yes' },
+            },
+        },
+    ],
+};
+const embeddedWithMetadata = WorldBook.fromEmbeddedJSON(rawEmbeddedWithMetadata);
+const embeddedWithMetadataOut = embeddedWithMetadata.toEmbeddedJSON() as Record<string, any>;
+const embeddedEntryOut = embeddedWithMetadataOut.entries[0];
+assert(embeddedWithMetadataOut.description === '内嵌世界书描述', '内嵌世界书保留 description');
+assert(embeddedWithMetadataOut.scan_depth === 6, '内嵌世界书保留 scan_depth');
+assert(embeddedWithMetadataOut.token_budget === 1024, '内嵌世界书保留 token_budget');
+assert(embeddedWithMetadataOut.recursive_scanning === false, '内嵌世界书保留 recursive_scanning=false');
+assert(embeddedWithMetadataOut.extensions.bookVendor === 'embedded-book', '内嵌世界书保留 book-level extensions');
+assert(embeddedWithMetadataOut.custom_embedded_book_field === '保留内嵌顶层', '内嵌世界书保留未知顶层字段');
+assert(embeddedEntryOut.priority === 7, '内嵌条目保留顶层 priority');
+assert(embeddedEntryOut.name === '旧版内嵌条目名称', '内嵌条目保留未知顶层 name');
+assert(embeddedEntryOut.case_sensitive === true, '内嵌条目保留顶层 case_sensitive');
+assert(embeddedEntryOut.extensions.case_sensitive === true, '内嵌条目将顶层 case_sensitive 同步到 extensions');
+assert(embeddedEntryOut.extensions.custom_extension_field.keep === 'yes', '内嵌条目保留未知 extensions 字段');
+
 // ============================================================
 //  测试6：解析含正则的角色卡
 // ============================================================
@@ -294,6 +381,31 @@ assert(Array.isArray(serializedWithWB.data.character_book.entries), 'character_b
 const serializedWithRegex = cardWithRegex.toJSON() as Record<string, any>;
 assert(serializedWithRegex.data.extensions.regex_scripts !== undefined, '含正则时输出 regex_scripts');
 assert(serializedWithRegex.data.extensions.regex_scripts.length === 1, '正则脚本数量正确');
+
+// 未知 data 字段和 extensions 字段应无损保留
+const rawCardWithExtras = {
+    spec: 'chara_card_v3',
+    spec_version: '3.0',
+    data: {
+        name: '扩展字段测试',
+        group_only_greetings: ['群聊问候A', '群聊问候B'],
+        custom_data_field: { nested: true, count: 2 },
+        extensions: {
+            talkativeness: '0.7',
+            fav: true,
+            world: '扩展世界书',
+            depth_prompt: { prompt: '扩展角色备注', depth: 3, role: 'user' },
+            third_party_payload: { source: 'tester', enabled: true },
+            scalar_extension: 42,
+        },
+    },
+};
+const cardWithExtras = CharacterCard.fromJSON(rawCardWithExtras);
+const serializedWithExtras = cardWithExtras.toJSON() as Record<string, any>;
+assert(serializedWithExtras.data.group_only_greetings.length === 2, '保留 data.group_only_greetings');
+assert(serializedWithExtras.data.custom_data_field.count === 2, '保留未知 data 字段');
+assert(serializedWithExtras.data.extensions.third_party_payload.source === 'tester', '保留未知 extensions 对象字段');
+assert(serializedWithExtras.data.extensions.scalar_extension === 42, '保留未知 extensions 标量字段');
 
 // ============================================================
 //  测试9：绑定/解绑操作（面向对象风格）
@@ -573,6 +685,43 @@ assert(hasCharaInPNG(pngFromNull), 'null底图写入成功');
 const readFromNull = CharacterCard.fromPNG(pngFromNull);
 assert(readFromNull!.name === '测试角色', 'null底图读回name正确');
 
+// ccv3 优先级与写回兼容
+const staleCharaJSON = JSON.stringify({
+    spec: 'chara_card_v3',
+    spec_version: '3.0',
+    data: { name: '旧 chara 数据' },
+});
+const preferredCcv3JSON = JSON.stringify({
+    spec: 'chara_card_v3',
+    spec_version: '3.0',
+    data: { name: '优先 ccv3 数据' },
+});
+const ccv3PreferredPNG = writeJsonToPNG(minPNG, staleCharaJSON, {
+    ccv3JsonString: preferredCcv3JSON,
+});
+const ccv3PreferredCard = CharacterCard.fromPNG(ccv3PreferredPNG);
+assert(ccv3PreferredCard!.name === '优先 ccv3 数据', 'PNG 读取优先使用 ccv3');
+
+const ccv3OnlyPNG = writeJsonToPNG(minPNG, staleCharaJSON, {
+    writeChara: false,
+    ccv3JsonString: preferredCcv3JSON,
+});
+const ccv3OnlyCard = CharacterCard.fromPNG(ccv3OnlyPNG);
+assert(ccv3OnlyCard!.name === '优先 ccv3 数据', 'PNG 支持只有 ccv3 的角色卡');
+
+const rewrittenPNG = card.toPNG(ccv3PreferredPNG);
+const rewrittenRaw = JSON.parse(readJsonFromPNG(rewrittenPNG)!);
+assert(rewrittenRaw.data.name === '测试角色', 'PNG 写回会清理旧 ccv3 并写入新数据');
+
+const v2Card = CharacterCard.fromJSON({
+    spec: 'chara_card_v2',
+    spec_version: '2.0',
+    data: { name: 'V2 PNG 测试' },
+});
+const v2PNG = v2Card.toPNG();
+const v2PreferredRaw = JSON.parse(readJsonFromPNG(v2PNG)!);
+assert(v2PreferredRaw.spec === 'chara_card_v3', 'PNG ccv3 chunk 输出为 V3 spec');
+
 // ============================================================
 //  测试17：CharacterCard.clone()
 // ============================================================
@@ -653,6 +802,151 @@ assert(
     invalidTimestampValue >= invalidTimestampStart && invalidTimestampValue <= invalidTimestampEnd,
     '无效时间戳保持回退到当前时间的兼容行为',
 );
+
+// ============================================================
+//  测试20：OpenAI 预设 prompts CRUD
+// ============================================================
+section('测试20：OpenAI 预设 prompts CRUD');
+
+const defaultOpenAIPreset = OpenAIPreset.create();
+assert(defaultOpenAIPreset.prompts.length === DEFAULT_OPENAI_PROMPTS.length, 'OpenAIPreset.create includes default SillyTavern prompts');
+assert(defaultOpenAIPreset.getPrompt('main')?.name === 'Main Prompt', 'OpenAIPreset.create includes Main Prompt');
+assert(defaultOpenAIPreset.getPrompt('worldInfoBefore')?.marker === true, 'OpenAIPreset.create includes World Info marker');
+assert(
+    defaultOpenAIPreset.listPromptEntries({ includeUnordered: false }).map(item => item.identifier).join(',') ===
+        DEFAULT_OPENAI_PROMPT_ORDER.map(item => item.identifier).join(','),
+    'OpenAIPreset.create uses default SillyTavern prompt order',
+);
+assert(defaultOpenAIPreset.temperature === 1, 'OpenAIPreset.create includes default temperature');
+defaultOpenAIPreset.temperature = 0.7;
+defaultOpenAIPreset.topP = 0.9;
+defaultOpenAIPreset.maxContext = 16384;
+defaultOpenAIPreset.maxTokens = 512;
+defaultOpenAIPreset.showThoughts = true;
+defaultOpenAIPreset.setSetting('custom_setting', { keep: true });
+const defaultPresetJSON = defaultOpenAIPreset.toJSON() as Record<string, any>;
+assert(defaultPresetJSON.temperature === 0.7, 'OpenAIPreset temperature setter writes top-level setting');
+assert(defaultPresetJSON.top_p === 0.9, 'OpenAIPreset topP setter writes top_p');
+assert(defaultPresetJSON.openai_max_context === 16384, 'OpenAIPreset maxContext setter writes openai_max_context');
+assert(defaultPresetJSON.openai_max_tokens === 512, 'OpenAIPreset maxTokens setter writes openai_max_tokens');
+assert(defaultOpenAIPreset.showThoughts === true, 'OpenAIPreset showThoughts getter reads top-level setting');
+assert(defaultOpenAIPreset.getSetting<Record<string, boolean>>('custom_setting')?.keep === true, 'OpenAIPreset generic setting helpers preserve custom values');
+
+const partialOpenAIPreset = OpenAIPreset.fromJSON({
+    prompts: [
+        { identifier: 'main', name: 'Custom Main', content: 'keep this main prompt' },
+    ],
+    prompt_order: [
+        { character_id: 100001, order: [{ identifier: 'main', enabled: false }] },
+    ],
+});
+partialOpenAIPreset.ensureDefaultPrompts();
+assert(partialOpenAIPreset.getPrompt('main')?.content === 'keep this main prompt', 'ensureDefaultPrompts keeps existing prompt content');
+assert(partialOpenAIPreset.getPrompt('worldInfoBefore')?.name === 'World Info (before)', 'ensureDefaultPrompts adds missing built-in prompts');
+assert(partialOpenAIPreset.isPromptEnabled('main') === false, 'ensureDefaultPrompts keeps existing prompt order state');
+assert(
+    partialOpenAIPreset.listPromptEntries({ includeUnordered: false }).map(item => item.identifier).join(',') ===
+        DEFAULT_OPENAI_PROMPT_ORDER.map(item => item.identifier).join(','),
+    'ensureDefaultPrompts restores default SillyTavern built-in order',
+);
+partialOpenAIPreset.addPrompt({ identifier: 'customTail', name: 'Custom Tail', content: 'tail' }, { enabled: true });
+partialOpenAIPreset.movePrompt('customTail', 0);
+partialOpenAIPreset.resetDefaultPromptOrder();
+assert(partialOpenAIPreset.listPromptEntries({ includeUnordered: false })[0].identifier === 'main', 'resetDefaultPromptOrder restores built-in order first');
+assert(
+    partialOpenAIPreset.listPromptEntries({ includeUnordered: false }).at(-1)?.identifier === 'customTail',
+    'resetDefaultPromptOrder appends custom ordered prompts',
+);
+
+const rawOpenAIPreset = {
+    temperature: 1,
+    custom_top_level: { keep: true },
+    prompts: [
+        {
+            identifier: 'main',
+            name: 'Main Prompt',
+            system_prompt: true,
+            role: 'system',
+            content: 'main content',
+        },
+        {
+            identifier: 'nsfw',
+            name: 'Auxiliary Prompt',
+            system_prompt: true,
+            role: 'system',
+            content: 'aux content',
+        },
+        {
+            identifier: 'custom',
+            name: '自定义条目',
+            system_prompt: false,
+            enabled: false,
+            role: 'system',
+            content: 'custom content',
+            custom_prompt_field: '保留',
+        },
+    ],
+    prompt_order: [
+        {
+            character_id: 100000,
+            order: [
+                { identifier: 'main', enabled: true },
+                { identifier: 'nsfw', enabled: true },
+            ],
+        },
+        {
+            character_id: 100001,
+            order: [
+                { identifier: 'main', enabled: true },
+                { identifier: 'custom', enabled: false },
+                { identifier: 'nsfw', enabled: true },
+            ],
+        },
+    ],
+    extensions: { presetVendor: 'tester' },
+};
+
+const openAIPreset = OpenAIPreset.fromJSON(rawOpenAIPreset);
+assert(openAIPreset.defaultCharacterId === DEFAULT_PROMPT_ORDER_CHARACTER_ID, '默认使用 100001 prompt_order 分组');
+assert(openAIPreset.prompts.length === 3, '解析 prompts 数量正确');
+assert(openAIPreset.listPromptEntries().map(item => item.identifier).join(',') === 'main,custom,nsfw', '按 prompt_order 列出条目');
+assert(openAIPreset.isPromptEnabled('custom') === false, '读取 prompt_order 启用状态');
+
+openAIPreset.setPromptEnabled('custom', true);
+assert(openAIPreset.isPromptEnabled('custom') === true, '启用 prompt 条目');
+
+openAIPreset.movePrompt('custom', 0);
+assert(openAIPreset.listPromptEntries()[0].identifier === 'custom', '移动 prompt 条目');
+
+const updatedPrompt = openAIPreset.updatePrompt('custom', {
+    name: '自定义条目 - 已修改',
+    content: 'updated content',
+});
+assert(updatedPrompt?.name === '自定义条目 - 已修改', '修改 prompt 名称');
+assert(openAIPreset.getPrompt('custom')?.content === 'updated content', '修改 prompt 内容');
+
+const clonedPrompt = openAIPreset.clonePrompt('custom', { name: '自定义条目 copy' }, { enabled: false });
+assert(clonedPrompt !== null && clonedPrompt.identifier !== 'custom', '复制 prompt 生成新 identifier');
+assert(openAIPreset.isPromptEnabled(clonedPrompt!.identifier) === false, '复制 prompt 使用指定启用状态');
+
+const addedPrompt = openAIPreset.addPrompt(
+    { identifier: 'added', name: '新增条目', role: 'system', content: 'added content' },
+    { after: 'main', enabled: true },
+);
+assert(addedPrompt.identifier === 'added', '新增 prompt 条目');
+assert(openAIPreset.getPrompt('added')?.name === '新增条目', '查询新增 prompt');
+assert(openAIPreset.searchPrompts('新增').length === 1, '搜索 prompt');
+
+const removedPrompt = openAIPreset.removePrompt('nsfw');
+assert(removedPrompt?.identifier === 'nsfw', '删除 prompt 条目');
+assert(openAIPreset.getPrompt('nsfw') === null, '删除后查询返回 null');
+assert(!openAIPreset.listPromptEntries().some(item => item.identifier === 'nsfw'), '删除后移除 prompt_order 引用');
+
+const serializedPreset = openAIPreset.toJSON() as Record<string, any>;
+assert(serializedPreset.temperature === 1, 'OpenAI preset 保留生成参数');
+assert(serializedPreset.custom_top_level.keep === true, 'OpenAI preset 保留未知顶层字段');
+assert(serializedPreset.extensions.presetVendor === 'tester', 'OpenAI preset 保留 extensions');
+assert(serializedPreset.prompts.find((p: any) => p.identifier === 'custom').custom_prompt_field === '保留', 'prompt 保留未知字段');
 
 // ============================================================
 //  测试结果汇总

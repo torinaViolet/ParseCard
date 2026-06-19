@@ -23,6 +23,12 @@
 export { CharacterCard } from './CharacterCard.js';
 export { WorldBook, WorldBookEntry } from './WorldBook.js';
 export { RegexScript } from './RegexScript.js';
+export {
+    OpenAIPreset,
+    DEFAULT_PROMPT_ORDER_CHARACTER_ID,
+    DEFAULT_OPENAI_PROMPTS,
+    DEFAULT_OPENAI_PROMPT_ORDER,
+} from './OpenAIPreset.js';
 
 // ============================================================
 //  枚举常量
@@ -69,6 +75,14 @@ export type {
     WorldBookEntryData,
     WorldBookData,
     RegexScriptData,
+    PromptRole,
+    ChatCompletionPrompt,
+    PromptOrderEntry,
+    PromptOrderGroup,
+    OpenAIPresetData,
+    PromptListItem,
+    PromptListOptions,
+    AddPromptOptions,
     SerializeOptions,
     SaveOptions,
 } from './types.js';
@@ -110,6 +124,8 @@ export {
     removeCharaFromPNG,
     hasCharaInPNG,
 } from './png.js';
+
+export type { PNGWriteOptions } from './png.js';
 
 // ============================================================
 //  工具函数

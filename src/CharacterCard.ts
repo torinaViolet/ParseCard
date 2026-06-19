@@ -318,8 +318,9 @@ export class CharacterCard {
     toJSON(options: SerializeOptions = {}): Record<string, unknown> {
         const ext = this._data.extensions;
 
-        // 构建 data.extensions
+        // 构建 data.extensions：保留未知扩展字段，再覆盖已知托管字段
         const serializedExt: Record<string, unknown> = {
+            ...(deepClone(ext) as Record<string, unknown>),
             talkativeness: ext.talkativeness,
             fav: ext.fav,
             world: ext.world,
@@ -331,12 +332,14 @@ export class CharacterCard {
         };
 
         // 正则脚本
+        delete serializedExt.regex_scripts;
         if (this._regexScripts.length > 0) {
             serializedExt.regex_scripts = RegexScript.toJSONArray(this._regexScripts);
         }
 
-        // 构建 data
+        // 构建 data：保留未知 data 字段，再覆盖已知托管字段
         const serializedData: Record<string, unknown> = {
+            ...(deepClone(this._data) as Record<string, unknown>),
             name: this._data.name,
             description: this._data.description,
             personality: this._data.personality,
@@ -352,6 +355,7 @@ export class CharacterCard {
             alternate_greetings: deepClone(this._data.alternate_greetings),
             extensions: serializedExt,
         };
+        delete serializedData.character_book;
 
         // 内嵌世界书
         if (this._worldBook) {
@@ -389,8 +393,15 @@ export class CharacterCard {
      * @returns PNG 文件的Uint8Array
      */
     toPNG(pngInput: Uint8Array | ArrayBuffer | null = null, options: SerializeOptions = {}): Uint8Array {
-        const jsonStr = JSON.stringify(this.toJSON(options));
-        return writeJsonToPNG(pngInput, jsonStr);
+        const json = this.toJSON(options);
+        const ccv3Json = {
+            ...deepClone(json),
+            spec: CharacterCardSpec.V3,
+            spec_version: CharacterCardSpecVersion.V3,
+        };
+        return writeJsonToPNG(pngInput, JSON.stringify(json), {
+            ccv3JsonString: JSON.stringify(ccv3Json),
+        });
     }
 
     /**
@@ -448,7 +459,8 @@ function parseCardData(rawData: Record<string, unknown>): CharacterCardData {
         character_book = wb.toData();
     }
 
-    const data = createDefaultCardData({
+    const dataOverrides: Partial<CharacterCardData> = {
+        ...(deepClone(rawData) as Partial<CharacterCardData>),
         name: asString(rawData.name),
         description: asString(rawData.description),
         personality: asString(rawData.personality),
@@ -463,13 +475,19 @@ function parseCardData(rawData: Record<string, unknown>): CharacterCardData {
         character_version: asString(rawData.character_version),
         alternate_greetings: asStringArray(rawData.alternate_greetings),
         extensions,
-    });
+    };
 
-    if (character_book) {
-        data.character_book = character_book;
+    if (rawData.group_only_greetings !== undefined) {
+        dataOverrides.group_only_greetings = asStringArray(rawData.group_only_greetings);
     }
 
-    return data;
+    if (character_book) {
+        dataOverrides.character_book = character_book;
+    } else {
+        delete dataOverrides.character_book;
+    }
+
+    return createDefaultCardData(dataOverrides);
 }
 
 function parseCardExtensions(rawExt: Record<string, unknown> | undefined): CharacterCardExtensions {
@@ -478,6 +496,7 @@ function parseCardExtensions(rawExt: Record<string, unknown> | undefined): Chara
     }
 
     const ext = createDefaultCardExtensions({
+        ...(deepClone(rawExt) as Partial<CharacterCardExtensions>),
         talkativeness: asString(rawExt.talkativeness, '0.5'),
         fav: asBoolean(rawExt.fav),
         world: asString(rawExt.world),

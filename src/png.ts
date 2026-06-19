@@ -11,7 +11,7 @@
  *   - 4 字节 CRC32 校验码
  *
  * SillyTavern 将角色卡 JSON 以 base64 编码存储在 tEXt chunk 中，
- * keyword 为 "chara"，用null 字节(0x00) 分隔 keyword 和文本内容。
+ * keyword 为 "chara" 或 "ccv3"，用null 字节(0x00) 分隔 keyword 和文本内容。
  */
 
 import { PNGError } from './errors.js';
@@ -21,6 +21,16 @@ const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 
 // tEXt chunk 中的关键字
 const CHARA_KEYWORD = 'chara';
+const CCV3_KEYWORD = 'ccv3';
+
+export interface PNGWriteOptions {
+    /** 是否写入 chara chunk，默认 true */
+    writeChara?: boolean;
+    /** 是否写入 ccv3 chunk，默认 true */
+    writeCcv3?: boolean;
+    /** ccv3 chunk 使用的 JSON 字符串；不传时与 chara 相同 */
+    ccv3JsonString?: string;
+}
 
 // ============================================================
 //  创建最小PNG
@@ -61,7 +71,7 @@ export function createMinimalPNG(): Uint8Array {
  */
 export function readJsonFromPNG(pngInput: Uint8Array | ArrayBuffer): string | null {
     const pngData = toUint8Array(pngInput);
-    const base64Text = extractCharaText(pngData);
+    const base64Text = extractCharacterCardText(pngData);
     if (!base64Text) return null;
 
     try {
@@ -77,7 +87,17 @@ export function readJsonFromPNG(pngInput: Uint8Array | ArrayBuffer): string | nu
  * @param jsonString 角色卡 JSON 字符串
  * @returns 新的 PNG 文件数据
  */
-export function writeJsonToPNG(pngInput: Uint8Array | ArrayBuffer | null, jsonString: string): Uint8Array {
+export function writeJsonToPNG(pngInput: Uint8Array | ArrayBuffer | null, jsonString: string): Uint8Array;
+export function writeJsonToPNG(
+    pngInput: Uint8Array | ArrayBuffer | null,
+    jsonString: string,
+    options: PNGWriteOptions,
+): Uint8Array;
+export function writeJsonToPNG(
+    pngInput: Uint8Array | ArrayBuffer | null,
+    jsonString: string,
+    options: PNGWriteOptions = {},
+): Uint8Array {
     let pngData: Uint8Array;
 
     if (pngInput == null) {
@@ -90,20 +110,25 @@ export function writeJsonToPNG(pngInput: Uint8Array | ArrayBuffer | null, jsonSt
         throw new PNGError('不是合法的 PNG 文件：签名不匹配');
     }
 
-    const base64Data = base64Encode(jsonString);
-    const newChunk = buildTextChunk(CHARA_KEYWORD, base64Data);
+    const newChunks: Uint8Array[] = [];
+    if (options.writeChara !== false) {
+        newChunks.push(buildTextChunk(CHARA_KEYWORD, base64Encode(jsonString)));
+    }
+    if (options.writeCcv3 !== false) {
+        newChunks.push(buildTextChunk(CCV3_KEYWORD, base64Encode(options.ccv3JsonString ?? jsonString)));
+    }
 
-    // 解析原始 chunks，移除已有的 chara tEXt chunk
+    // 解析原始 chunks，移除已有的 chara / ccv3 tEXt chunk
     const chunks = parseChunks(pngData);
     const filteredChunks = chunks.filter(chunk => {
         if (chunk.type !== 'tEXt') return true;
         const nullIndex = chunk.data.indexOf(0x00);
         if (nullIndex === -1) return true;
         const keyword = decodeString(chunk.data.slice(0, nullIndex));
-        return keyword !== CHARA_KEYWORD;
+        return !isCharacterCardKeyword(keyword);
     });
 
-    // 在IHDR 之后、第一个 IDAT 之前插入新的 chara chunk
+    // 在IHDR 之后、第一个 IDAT 之前插入新的角色卡 chunk
     let insertIndex = 1;
     for (let i = 0; i < filteredChunks.length; i++) {
         if (filteredChunks[i].type === 'IDAT') {
@@ -116,20 +141,20 @@ export function writeJsonToPNG(pngInput: Uint8Array | ArrayBuffer | null, jsonSt
     const parts: Uint8Array[] = [PNG_SIGNATURE];
     for (let i = 0; i < filteredChunks.length; i++) {
         if (i === insertIndex) {
-            parts.push(newChunk);
+            parts.push(...newChunks);
         }
         const chunk = filteredChunks[i];
         parts.push(buildChunk(chunk.type, chunk.data));
     }
     if (insertIndex >= filteredChunks.length) {
-        parts.push(newChunk);
+        parts.push(...newChunks);
     }
 
     return concatArrays(...parts);
 }
 
 /**
- * 从 PNG 文件中移除 chara tEXt chunk
+ * 从 PNG 文件中移除角色卡 tEXt chunk
  */
 export function removeCharaFromPNG(pngInput: Uint8Array | ArrayBuffer): Uint8Array {
     const pngData = toUint8Array(pngInput);
@@ -146,7 +171,7 @@ export function removeCharaFromPNG(pngInput: Uint8Array | ArrayBuffer): Uint8Arr
             const nullIndex = chunk.data.indexOf(0x00);
             if (nullIndex !== -1) {
                 const keyword = decodeString(chunk.data.slice(0, nullIndex));
-                if (keyword === CHARA_KEYWORD) continue;
+                if (isCharacterCardKeyword(keyword)) continue;
             }
         }
         parts.push(buildChunk(chunk.type, chunk.data));
@@ -161,7 +186,7 @@ export function removeCharaFromPNG(pngInput: Uint8Array | ArrayBuffer): Uint8Arr
 export function hasCharaInPNG(pngInput: Uint8Array | ArrayBuffer): boolean {
     try {
         const pngData = toUint8Array(pngInput);
-        return extractCharaText(pngData) !== null;
+        return extractCharacterCardText(pngData) !== null;
     } catch {
         return false;
     }
@@ -218,7 +243,15 @@ function parseChunks(pngData: Uint8Array): PNGChunk[] {
     return chunks;
 }
 
-function extractCharaText(pngData: Uint8Array): string | null {
+function isCharacterCardKeyword(keyword: string): boolean {
+    return keyword === CHARA_KEYWORD || keyword === CCV3_KEYWORD;
+}
+
+function extractCharacterCardText(pngData: Uint8Array): string | null {
+    return extractTextChunk(pngData, CCV3_KEYWORD) ?? extractTextChunk(pngData, CHARA_KEYWORD);
+}
+
+function extractTextChunk(pngData: Uint8Array, expectedKeyword: string): string | null {
     const chunks = parseChunks(pngData);
 
     for (const chunk of chunks) {
@@ -226,7 +259,7 @@ function extractCharaText(pngData: Uint8Array): string | null {
         const nullIndex = chunk.data.indexOf(0x00);
         if (nullIndex === -1) continue;
         const keyword = decodeString(chunk.data.slice(0, nullIndex));
-        if (keyword !== CHARA_KEYWORD) continue;
+        if (keyword !== expectedKeyword) continue;
         return decodeString(chunk.data.slice(nullIndex + 1));
     }
 

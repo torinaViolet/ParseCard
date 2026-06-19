@@ -16,7 +16,12 @@ import {
     loadWorldBookAsync,
     loadRegexScript,
     loadRegexScriptAsync,
+    loadOpenAIPreset,
+    loadOpenAIPresetAsync,
+    saveOpenAIPreset,
+    saveOpenAIPresetAsync,
 } from '../io.js';
+import { OpenAIPreset } from '../index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = resolve(__dirname, '..', '..', 'SillyTavern数据');
@@ -132,9 +137,38 @@ const rs2 = await loadRegexScriptAsync(resolve(dataDir, 'regex-测试正则.json
 assert(rs2.scriptName === '测试正则', '异步加载正则脚本正确');
 
 // ============================================================
-//  测试7：完整流程（加载→修改→保存→读回）
+//  测试7：OpenAI 预设读写
 // ============================================================
-section('IO 测试7：完整流程（加载→修改→保存→读回）');
+section('IO 测试7：OpenAI 预设读写');
+
+const preset = OpenAIPreset.fromJSON({
+    temperature: 1,
+    prompts: [
+        { identifier: 'main', name: 'Main Prompt', content: 'main' },
+    ],
+    prompt_order: [
+        { character_id: 100001, order: [{ identifier: 'main', enabled: true }] },
+    ],
+});
+preset.addPrompt({ identifier: 'extra', name: '额外条目', content: 'extra' }, { enabled: false });
+
+const presetPath = resolve(tmpDir, 'openai-preset.json');
+saveOpenAIPreset(preset, presetPath);
+assert(existsSync(presetPath), '保存 OpenAI 预设成功');
+
+const reloadedPreset = loadOpenAIPreset(presetPath);
+assert(reloadedPreset.getPrompt('extra')?.name === '额外条目', '同步加载 OpenAI 预设正确');
+assert(reloadedPreset.isPromptEnabled('extra') === false, 'OpenAI 预设启用状态读回正确');
+
+const asyncPresetPath = resolve(tmpDir, 'openai-preset-async.json');
+await saveOpenAIPresetAsync(preset, asyncPresetPath);
+const asyncReloadedPreset = await loadOpenAIPresetAsync(asyncPresetPath);
+assert(asyncReloadedPreset.prompts.length === 2, '异步保存/加载 OpenAI 预设正确');
+
+// ============================================================
+//  测试8：完整流程（加载→修改→保存→读回）
+// ============================================================
+section('IO 测试8：完整流程（加载→修改→保存→读回）');
 
 const fullCard = loadCharacterCard(resolve(dataDir, '测试角色.json'));
 fullCard.name = '修改后的角色';
@@ -175,7 +209,7 @@ assert(fullJsonReloaded.hasRegexScripts, '完整流程JSON：正则脚本存在'
 // ============================================================
 const tmpFiles = [
     jsonPath, pngPath, asyncJsonPath, asyncPngPath,
-    fullPngPath, fullJsonPath,
+    presetPath, asyncPresetPath, fullPngPath, fullJsonPath,
 ];
 for (const f of tmpFiles) {
     if (existsSync(f)) unlinkSync(f);
