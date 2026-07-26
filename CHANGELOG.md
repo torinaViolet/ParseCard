@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.0.4 - 2026-07-27
+
+- Fix: `WorldBookEntry.fromEmbeddedJSON` now correctly prefers the `uid` field over `id` when both are present in an embedded-format entry. Previously, entries with a correct `uid` field but a divergent `id` field (e.g., all entries sharing `id: 0`) would be parsed with duplicate internal uids, causing editors and validators to misidentify entries. The fix falls back to `id` only when `uid` is absent, preserving backward compatibility.
+
 ## 2.0.3 - 2026-06-19
 
 - Document OpenAI / Chat Completion preset management, default SillyTavern prompt entries, common preset settings, and Node.js preset I/O in the README.

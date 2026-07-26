@@ -257,7 +257,7 @@ export class WorldBookEntry {
         }
 
         return new WorldBookEntry(createDefaultWorldBookEntryData({
-            uid: asInteger(obj.id, 0) ?? 0,
+            uid: hasOwn(obj, 'uid') ? (asInteger(obj.uid, 0) ?? 0) : (asInteger(obj.id, 0) ?? 0),
             keys: asStringArray(obj.keys),
             secondary_keys: asStringArray(obj.secondary_keys),
             comment: asString(obj.comment),
